@@ -72,14 +72,10 @@ tf.reset_default_graph()  # Очищаем граф tensorflow
 
 boxes = 4
 actions = [[i, j] for i in range(boxes) for j in range(boxes) if i != j]
-myAgent = Agent(lr=0.5, s_size=boxes, a_size=boxes*(boxes-1), h_size=32)  # Инициализируем агента
-# myAgent = Agent(lr=1e-2, s_size=4, a_size=2, h_size=8)  # Инициализируем агента
+myAgent = Agent(lr=0.01, s_size=boxes, a_size=boxes*(boxes-1), h_size=32)  # Инициализируем агента
 saver = tf.train.Saver()
 
-# env = Storage(32, 32, ex='storage.txt')
 env = Manipulator(boxes)
-# env = gym.make('CartPole-v0')
-choice = list(range(boxes))
 
 total_episodes = 5000  # Количество итераций обучения
 max_ep = 200
@@ -103,35 +99,35 @@ with tf.Session() as sess:
         for j in range(max_ep):
             a_dist = sess.run(myAgent.output, feed_dict={myAgent.state_in: [st]})[0]
             act = a_dist.argmax()
-            # act = np.random.choice(range(len(a_dist)), p=a_dist)
-            st1, rew, done = env.step(actions[act][0], actions[act][1])  # Получить награду за совершенное действие
-            # st1, rew, done, _ = env.step(act)
+
+            st1, rew, done = env.step(*actions[act])  # Получить награду за совершенное действие
+            # print(st, actions[act], rew, st1)
+
             ep_history.append([st, act, rew, st1])
-            st = st1
+            st = st1.copy()
             sum_rew += rew
             if done:
                 winned_eps += 1
-                ep_history = np.array(ep_history)
-                ep_history[:, 2] = discount_rewards(ep_history[:, 2])
-                feed_dict = {myAgent.reward_holder: ep_history[:, 2],
-                             myAgent.action_holder: ep_history[:, 1],
-                             myAgent.state_in: np.vstack(ep_history[:, 0])}
-                grads = sess.run(myAgent.gradients, feed_dict=feed_dict)
-                for idx, grad in enumerate(grads):
-                    gradBuffer[idx] += grad
-
-                if i % update_frequency == 0 and i != 0:
-                    feed_dict = dictionary = dict(zip(myAgent.gradient_holders,
-                                                      gradBuffer))
-                    _ = sess.run(myAgent.update_batch, feed_dict=feed_dict)
-                    for ix, grad in enumerate(gradBuffer):
-                        gradBuffer[ix] = grad * 0
-
-                total_reward.append(sum_rew)
                 break
 
-        if j == max_ep-1:
-            total_reward.append(sum_rew - 50)
+        ep_history = np.array(ep_history)
+        ep_history[:, 2] = discount_rewards(ep_history[:, 2])
+        feed_dict = {myAgent.reward_holder: ep_history[:, 2],
+                     myAgent.action_holder: ep_history[:, 1],
+                     myAgent.state_in: np.vstack(ep_history[:, 0])}
+        grads = sess.run(myAgent.gradients, feed_dict=feed_dict)
+        for idx, grad in enumerate(grads):
+            gradBuffer[idx] += grad
+
+        if i % update_frequency == 0 and i != 0:
+            feed_dict = dictionary = dict(zip(myAgent.gradient_holders,
+                                              gradBuffer))
+            _ = sess.run(myAgent.update_batch, feed_dict=feed_dict)
+            for ix, grad in enumerate(gradBuffer):
+                gradBuffer[ix] = grad * 0
+
+        total_reward.append(sum_rew)
+
 
         if i % 100 == 0 and i != 0:
             print(np.mean(total_reward[-100:]), '\t--- Progress: ', ((i) * 100 / total_episodes),

@@ -30,7 +30,7 @@ class Manipulator:
         return self.boxes
 
     def count_sum(self):
-        return -np.abs(self.boxes - self.need).sum()
+        return ((self.boxes == self.need)-1).sum()
 
     def step(self, fr, to):
         self.boxes[to], self.boxes[fr] = self.boxes[fr], self.boxes[to]
